@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import json
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -43,9 +44,15 @@ def in_zone(df: pd.DataFrame, zone: dict) -> pd.DataFrame:
 
 
 def on_props(df: pd.DataFrame, props: list, min_iou: float) -> np.ndarray:
-    """True for detections that are really a decoration: they mostly overlap a prop's box."""
+    """True for detections that are really a decoration: they mostly overlap a prop's box,
+    or sit almost entirely inside it (the detector sometimes boxes just part of the prop)."""
+    def inside(b, prop):
+        ix = max(0.0, min(b[2], prop[2]) - max(b[0], prop[0]))
+        iy = max(0.0, min(b[3], prop[3]) - max(b[1], prop[1]))
+        return ix * iy / ((b[2] - b[0]) * (b[3] - b[1]))
+
     boxes = df[["x1", "y1", "x2", "y2"]].to_numpy()
-    return np.array([any(iou(b, prop) >= min_iou for prop in props) for b in boxes], dtype=bool)
+    return np.array([any(iou(b, prop) >= min_iou or inside(b, prop) >= 0.8 for prop in props) for b in boxes], dtype=bool)
 
 
 def crop(frames_dir: Path, r) -> Image.Image:
@@ -175,6 +182,8 @@ def main() -> None:
         sure = (p.max(1) > 0.95) & (labels < 0)
         labels[sure] = p[sure].argmax(1)
     p_single = clf.predict_proba(emb)
+    # Saved so count_tracks.py can recognize the hosts in its own crops.
+    (args.out / "host_model.pkl").write_bytes(pickle.dumps({"names": names, "clf": clf, "clip": args.clip}))
 
     # One frame on its own is a noisy guess. Average each person's guesses over
     # their whole track: the hosts stand around for hours, visitors pass through.

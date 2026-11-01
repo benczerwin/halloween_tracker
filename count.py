@@ -123,9 +123,16 @@ def strip(frames: list[Path], dets: pd.DataFrame, zone: list, counts: pd.Series,
 
 
 def chart(visits: pd.DataFrame, out: Path, bin_minutes: int) -> None:
-    per_bin = visits.set_index("start")["people"].resample(f"{bin_minutes}min").sum()
+    cols = ["kids", "adults"] if "kids" in visits else ["people"]
+    per_bin = visits.set_index("start")[cols].resample(f"{bin_minutes}min").sum()
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(per_bin.index, per_bin.values, width=bin_minutes / 1440 * 0.85, align="edge", color="#e8731a")
+    width = bin_minutes / 1440 * 0.85
+    bottom = None
+    for col, color in zip(cols, ["#e8731a", "#8a8f98"]):
+        ax.bar(per_bin.index, per_bin[col], width=width, align="edge", color=color, bottom=bottom, label=col)
+        bottom = per_bin[col] if bottom is None else bottom + per_bin[col]
+    if len(cols) > 1:
+        ax.legend(frameon=False)
     ax.set_title(f"Trick-or-treaters per {bin_minutes} minutes ({visits['people'].sum()} total, {len(visits)} groups)")
     ax.set_ylabel("people")
     ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%-I:%M"))
@@ -140,7 +147,7 @@ def review_page(visits: pd.DataFrame, out: Path, chart_name: str) -> None:
         n = v.Index + 1
         rows.append(
             f"""<section id="v{n}">
-  <h2>#{n} &middot; {v.start:%-I:%M:%S %p} &middot; <b>{v.people}</b> {"person" if v.people == 1 else "people"}
+  <h2>#{n} &middot; {v.start:%-I:%M:%S %p} &middot; <b>{v.people}</b> {"person" if v.people == 1 else "people"}{f" (~{v.kids} kids)" if hasattr(v, "kids") else ""}
   <small>{v.seconds}s in the yard, seen in {v.frames_seen} frames</small></h2>
   <img class="best" src="visits/visit_{n:03d}.jpg" loading="lazy">
   <img class="strip" src="visits/strip_{n:03d}.jpg" loading="lazy">
@@ -193,6 +200,12 @@ def main() -> None:
     if visits.empty:
         print("No visits found.")
         return
+    if "p_kid" in visitors:
+        # Kids in a visit: its size times the average kid-likelihood of everyone seen in it.
+        vt = pd.to_datetime(visitors["frame"], format="%Y%m%d_%H%M%S")
+        share = [visitors.loc[(vt >= v.start) & (vt <= v.end), "p_kid"].mean() for v in visits.itertuples()]
+        visits["kids"] = (visits["people"] * pd.Series(share)).round().astype(int)
+        visits["adults"] = visits["people"] - visits["kids"]
 
     args.out.mkdir(parents=True, exist_ok=True)
     visits.to_csv(args.out / "visits.csv", index_label="visit")
@@ -211,6 +224,8 @@ def main() -> None:
     review_page(visits, args.out / "review.html", chart_name)
 
     print(f"{len(visits)} groups, {visits['people'].sum()} people")
+    if "kids" in visits:
+        print(f"about {visits['kids'].sum()} kids and {visits['adults'].sum()} adults")
     print(visits["people"].value_counts().sort_index().to_string())
 
 

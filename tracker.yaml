@@ -1,0 +1,13 @@
+# BoT-SORT settings for a fixed camera sampled at ~3 frames per second.
+tracker_type: botsort
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.4      # don't start tracks on weak detections
+track_buffer: 30           # keep a lost person ~9 s (they step behind the tree)
+match_thresh: 0.8
+fuse_score: True
+gmc_method: none           # the camera doesn't move
+proximity_thresh: 0.5
+appearance_thresh: 0.8
+with_reid: True            # use appearance to re-link people after occlusion
+model: auto
