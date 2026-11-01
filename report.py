@@ -25,6 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from residents import on_props
 
+FONT = Path(__file__).parent / "assets" / "Creepster.woff2"  # SIL Open Font License; embedded so it works offline
 KID, ADULT, HOST, PROP = "#d9731c", "#8c78d8", "#5fd0c0", "#8a8494"  # chart colors validated on the dark surface
 
 
@@ -86,7 +87,8 @@ def chart_svg(people: pd.DataFrame) -> tuple[str, str]:
         parts.append(f'<line x1="{left}" x2="{W - 8}" y1="{y:.1f}" y2="{y:.1f}" class="grid"/>'
                      f'<text x="{left - 6}" y="{y + 4:.1f}" class="tick" text-anchor="end">{v}</text>')
     rows = []
-    for i, (when, r) in enumerate(per.iterrows()):
+    for i, (when, r) in enumerate(per.astype({"kids": int, "adults": int, "size": int}).iterrows()):
+        r = {k: int(v) for k, v in r.items()}
         x = left + i * slot + (slot - bw) / 2
         hk = plot_h * r["kids"] / vmax
         ha = plot_h * r["adults"] / vmax
@@ -145,6 +147,9 @@ def main() -> None:
     linger = people.loc[people["seconds"].idxmax()]
     hours = (arrivals.iloc[-1] - arrivals.iloc[0]).total_seconds() / 3600
 
+    # Camera on/off: the first and last extracted frames span the whole recording.
+    frame_names = sorted(f.stem for f in args.frames.glob("*.jpg"))
+    rec_start, rec_end = (fmt_time(pd.to_datetime(n, format="%Y%m%d_%H%M%S")) for n in (frame_names[0], frame_names[-1]))
     img64, img_time, img_count = example_frame(args.out, args.frames, zone, people)
     svg, table = chart_svg(people)
 
@@ -167,7 +172,8 @@ def main() -> None:
         avg_group=total / len(groups), hours=hours,
         first=fmt_time(arrivals.iloc[0]), last=fmt_time(arrivals.iloc[-1]),
         findings=finding_html, chart=svg, table=table, img=img64, img_time=img_time, img_count=img_count,
-        KID=KID, ADULT=ADULT, HOST=HOST, PROP=PROP,
+        KID=KID, ADULT=ADULT, HOST=HOST, PROP=PROP, font=base64.b64encode(FONT.read_bytes()).decode(),
+        rec_start=rec_start, rec_end=rec_end,
     )
     (args.out / "report.html").write_text(page)
     print(f"wrote {args.out / 'report.html'}: {total} people, {kids} kids, {adults} adults")
@@ -178,8 +184,9 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Haunted Pumpkin Graveyard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
+  @font-face {{ font-family: "Creepster"; src: url(data:font/woff2;base64,{font}) format("woff2"); font-display: block; }}
   :root {{
     --bg: #17121f; --panel: #211a2c; --line: #352b44;
     --ink: #f3ece2; --ink-2: #c4b8cf; --ink-3: #8f839d;
@@ -192,7 +199,7 @@ TEMPLATE = """<!doctype html>
   main {{ max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }}
   header {{ position: relative; padding: 24px 0 8px; }}
   .kicker {{ color: var(--pumpkin); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 13px; }}
-  h1 {{ font-family: Creepster, cursive; font-weight: 400; font-size: clamp(44px, 9vw, 84px); line-height: .95;
+  h1 {{ font-family: Creepster, Impact, "Arial Black", sans-serif; font-weight: 400; font-size: clamp(44px, 9vw, 84px); line-height: .95;
         margin: 8px 0 12px; color: var(--pumpkin); overflow-wrap: anywhere; text-shadow: 0 0 24px rgba(240,138,36,.35); }}
   .sub {{ color: var(--ink-2); max-width: 620px; margin: 0; }}
   .graves {{ display: block; width: 100%; height: 70px; margin-top: 12px; }}
@@ -204,7 +211,7 @@ TEMPLATE = """<!doctype html>
   .stat.hero {{ grid-column: span 2; border-color: #5a3a1c; background: linear-gradient(160deg, #2c1d16, var(--panel)); }}
   .stat.hero .n {{ font-size: 64px; color: var(--pumpkin); }}
   section {{ background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-bottom: 20px; }}
-  h2 {{ font-family: Creepster, cursive; font-weight: 400; font-size: 30px; margin: 0 0 4px; color: var(--ink); letter-spacing: .02em; }}
+  h2 {{ font-family: Creepster, Impact, "Arial Black", sans-serif; font-weight: 400; font-size: 30px; margin: 0 0 4px; color: var(--ink); letter-spacing: .02em; }}
   .note {{ color: var(--ink-3); font-size: 14px; margin: 0 0 12px; }}
   .legend {{ display: flex; gap: 16px; color: var(--ink-2); font-size: 14px; margin-bottom: 6px; flex-wrap: wrap; }}
   .legend i {{ display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }}
@@ -236,8 +243,8 @@ TEMPLATE = """<!doctype html>
 <header>
   <div class="kicker">Halloween 2026 &middot; Visitor census</div>
   <h1>The Haunted Pumpkin Graveyard</h1>
-  <p class="sub">A camera watched the front gate from {first} to {last}. Here is everyone who dared to enter,
-  counted one by one by a computer that does not believe in ghosts.</p>
+  <p class="sub">A camera watched the front gate from {rec_start} to {rec_end}. The first trick-or-treater crept in at {first},
+  the last at {last}. Here is everyone who dared to enter, counted one by one by a computer that does not believe in ghosts.</p>
   <svg class="graves" viewBox="0 0 960 70" preserveAspectRatio="none" aria-hidden="true">
     <path d="M0 62 Q240 48 480 58 T960 54 V70 H0Z" fill="#2a2138"/>
     <g fill="#3d3150">
@@ -254,7 +261,7 @@ TEMPLATE = """<!doctype html>
   <div class="stat"><div class="n">{kids}</div><div class="l"><span class="swatch" style="background:var(--kid)"></span>little goblins (kids)</div></div>
   <div class="stat"><div class="n">{adults}</div><div class="l"><span class="swatch" style="background:var(--adult)"></span>grown-up spirits</div></div>
   <div class="stat"><div class="n">{groups}</div><div class="l">covens &middot; {avg_group:.1f} per group</div></div>
-  <div class="stat"><div class="n">{hours:.1f}h</div><div class="l">of haunting, {first}&ndash;{last}</div></div>
+  <div class="stat"><div class="n">{hours:.1f}h</div><div class="l">from first visitor to last, {first}&ndash;{last}</div></div>
 </div>
 
 <section>
