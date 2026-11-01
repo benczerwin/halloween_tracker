@@ -18,11 +18,13 @@ Requires `ffmpeg` (`brew install ffmpeg`) and [uv](https://docs.astral.sh/uv/).
 
 1. **Yard zone** (`zone.json`): only people whose feet are inside the yard count, so people walking by on the
    sidewalk don't.
-2. **Hosts** (`residents.json`): the people handing out candy are in view all afternoon. Each is described in a
+2. **Decorations** (`zone.json` `ignore_boxes`): props the detector mistakes for people never move, so their boxes are
+   listed once and any detection mostly overlapping one is ignored.
+3. **Hosts** (`residents.json`): the people handing out candy are in view all afternoon. Each is described in a
    sentence; CLIP picks out clear examples, a small classifier learns their look, and the person tags are averaged
    over each short track. If a host was recognized just before and after a frame, the closest match in that frame
-   is tagged too. Anything that stays in exactly the same spot for minutes (a pumpkin stack) is a decoration.
-3. **Visits**: frames with visitors are grouped into visits, split by 20+ seconds of empty yard. A visit's size is
+   is tagged too.
+4. **Visits**: frames with visitors are grouped into visits, split by 20+ seconds of empty yard. A visit's size is
    the number of arrivals (the count stepping up and staying up), and at least the most people seen at once.
 
 ## Checking the results

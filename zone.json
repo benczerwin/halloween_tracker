@@ -1,6 +1,56 @@
 {
-  "comment": "Your yard: the front walk from the gate to the candy table plus the lawn (people also cut across from the driveway), but not the sidewalk behind the fence. In 1280x720 frame pixels. A person counts when the bottom-middle of their box (their feet) is inside.",
-  "polygon": [[250, 70], [360, 110], [385, 210], [560, 245], [790, 305], [820, 410], [1070, 535], [1060, 720], [380, 720], [250, 400]],
+  "comment": "Your yard: the front walk from the gate to the candy table plus the lawn (people also cut across from the driveway), but not the sidewalk behind the fence. In 1280x720 frame pixels. A person counts when the bottom-middle of their box (their feet) is inside. ignore_boxes are props the detector mistakes for people (the pumpkin stack): detections overlapping one by ignore_iou or more don't count.",
+  "polygon": [
+    [
+      250,
+      70
+    ],
+    [
+      360,
+      110
+    ],
+    [
+      385,
+      210
+    ],
+    [
+      560,
+      245
+    ],
+    [
+      790,
+      305
+    ],
+    [
+      820,
+      410
+    ],
+    [
+      1070,
+      535
+    ],
+    [
+      1060,
+      720
+    ],
+    [
+      380,
+      720
+    ],
+    [
+      250,
+      400
+    ]
+  ],
   "min_conf": 0.35,
-  "min_height": 40
+  "min_height": 40,
+  "ignore_boxes": [
+    [
+      617,
+      315,
+      677,
+      408
+    ]
+  ],
+  "ignore_iou": 0.5
 }

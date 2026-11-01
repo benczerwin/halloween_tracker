@@ -42,6 +42,12 @@ def in_zone(df: pd.DataFrame, zone: dict) -> pd.DataFrame:
     return df[Polygon(zone["polygon"]).contains_points(feet)].reset_index(drop=True)
 
 
+def on_props(df: pd.DataFrame, props: list, min_iou: float) -> np.ndarray:
+    """True for detections that are really a decoration: they mostly overlap a prop's box."""
+    boxes = df[["x1", "y1", "x2", "y2"]].to_numpy()
+    return np.array([any(iou(b, prop) >= min_iou for prop in props) for b in boxes], dtype=bool)
+
+
 def crop(frames_dir: Path, r) -> Image.Image:
     img = Image.open(frames_dir / f"{r.frame}.jpg").convert("RGB")
     pad_x, pad_y = (r.x2 - r.x1) * 0.1, (r.y2 - r.y1) * 0.05
@@ -126,6 +132,7 @@ def main() -> None:
     zone = json.loads(args.zone.read_text())
     residents = json.loads(args.residents.read_text())
     df = in_zone(pd.read_csv(args.detections, dtype={"frame": str}), zone)
+    ignored = on_props(df, zone.get("ignore_boxes", []), zone.get("ignore_iou", 0.5))
 
     arch, weights = args.clip.split(":")
     model, _, preprocess = open_clip.create_model_and_transforms(arch, pretrained=weights)
@@ -180,6 +187,7 @@ def main() -> None:
     # frame, the (up to) N most host-like people are the hosts.
     n_hosts = len(names)
     host_p = p[:, :n_hosts].sum(1)
+    host_p[ignored] = 0
     min_prob = residents.get("min_prob", 0.5)
     df["who"], df["score"] = "visitor", 0.0
     frames = df.groupby("frame").indices
@@ -213,17 +221,11 @@ def main() -> None:
             free = [r for r in frames[frame] if df["who"].iat[r] == "visitor"]
             tag(sorted(free, key=lambda r: -host_p[r])[:missing], fill_prob)
 
-    # Decorations: a "person" box that sits in the same spot for minutes (e.g. the
-    # stack of pumpkins on the lawn). People shift around; props don't.
-    key = list(zip(*(df[c].floordiv(12) for c in ["x1", "y1", "x2", "y2"])))
-    spot = pd.Series(key, index=df.index)
-    frames_at_spot = df.groupby(spot)["frame"].transform("nunique")
-    # Kids stand at the gate over and over too, so the crop must also look like a prop.
-    prop = probs.argmax(1) == len(names) + VISITOR_PROMPTS.index("a stack of white pumpkins")
-    static = (frames_at_spot >= residents.get("static_frames", 120)) & prop & (df["who"] == "visitor")
-    df.loc[static, "who"] = "decoration"
-    crop_sheet(df[static], args.frames, review / "decorations.jpg", "Tagged as decorations (not counted)")
-    print(f"decorations: {static.sum()} detections")
+    # Decorations: the detector sometimes sees a prop (the pumpkin stack) as a
+    # person. Props never move, so zone.json lists their boxes to ignore.
+    df.loc[ignored, "who"] = "decoration"
+    crop_sheet(df[ignored], args.frames, review / "decorations.jpg", "Ignored as decorations (not counted)")
+    print(f"decorations: {ignored.sum()} detections")
 
     for i, name in enumerate(names):
         tagged = df[df["who"] == name]

@@ -1,10 +1,13 @@
 {
   "comment": "People who are in view all afternoon and should never be counted. Each host is learned from the crops that best match its description; check output/review/seeds_*.jpg and host_*.jpg. min_prob is how sure the classifier must be to tag someone as a host: raise it if visitors show up in host_*.jpg, lower it if a host shows up in near_*.jpg. fill_prob is the lower bar used when a host was seen seconds before and after.",
   "hosts": {
-    "pumpkin": {"description": "a man wearing a carved jack-o-lantern mask over his head, a black long-sleeve shirt, and a brown leather apron"},
-    "flannel": {"description": "a man in a plaid flannel shirt and blue denim bib overalls"}
+    "pumpkin": {
+      "description": "a man wearing a carved jack-o-lantern mask over his head, a black long-sleeve shirt, and a brown leather apron"
+    },
+    "flannel": {
+      "description": "a man in a plaid flannel shirt and blue denim bib overalls"
+    }
   },
   "min_prob": 0.5,
-  "fill_prob": 0.3,
-  "static_frames": 120
+  "fill_prob": 0.3
 }
