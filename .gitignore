@@ -1,0 +1,24 @@
+# Raw footage and anything derived from it contains images of people.
+# This repo is public: never commit these.
+footage/
+frames/
+output/*
+!output/visits.csv
+!output/per_15_minutes.png
+*.mp4
+*.mov
+*.jpg
+*.jpeg
+*.webp
+
+# Model weights (downloaded automatically)
+*.pt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# macOS
+.DS_Store
